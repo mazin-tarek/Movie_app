@@ -23,8 +23,9 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  final _profileKey = GlobalKey<ProfileScreenState>();
 
-  final List<Widget> _screens = [
+  late final List<Widget> _screens = [
     const HomeScreen(),
 
     BlocProvider(create: (_) => sl<SearchBloc>(), child: const SearchScreen()),
@@ -34,7 +35,7 @@ class _MainScreenState extends State<MainScreen> {
             ..add(GetMoviesByGenreRequested(genre: 'Action', page: 1)),
       child: BrowseScreen(),
     ),
-    ProfileScreen(),
+    ProfileScreen(key: _profileKey),
   ];
 
   @override
@@ -51,6 +52,10 @@ class _MainScreenState extends State<MainScreen> {
         currentIndex: _currentIndex,
         onTap: (index) {
           if (index >= _screens.length) return;
+
+          if (index == 3) {
+            _profileKey.currentState?.refreshCollections();
+          }
 
           setState(() {
             _currentIndex = index;

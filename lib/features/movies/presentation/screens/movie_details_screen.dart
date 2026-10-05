@@ -24,130 +24,123 @@ import 'package:movieapp/l10n/app_localizations.dart';
 
 class MovieDetailsScreen extends StatelessWidget {
   final MovieEntity movie;
+  final VoidCallback? onReturn;
 
-  const MovieDetailsScreen({
-    super.key,
-    required this.movie,
-  });
+  const MovieDetailsScreen({super.key, required this.movie, this.onReturn});
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(
-          create: (_) {
-            final bloc = sl<WatchlistBloc>();
-            final user = FirebaseAuth.instance.currentUser;
-            if (user != null) {
-              bloc.add(
-                CheckMovieInWatchlist(
-                  userId: user.uid,
-                  movieId: movie.id,
-                ),
-              );
-            }
-            return bloc;
-          },
-        ),
-        BlocProvider(
-          create: (_) {
-            final bloc = sl<HistoryBloc>();
-            final user = FirebaseAuth.instance.currentUser;
-            if (user != null) {
-              bloc.add(
-                AddMovieToHistory(
-                  userId: user.uid,
-                  movie: movie,
-                ),
-              );
-            }
-            return bloc;
-          },
-        ),
-      ],
-      child: BlocBuilder<MovieDetailsBloc, MovieDetailsState>(
-        builder: (context, state) {
-          if (state is MovieDetailsLoading) {
-            return const Scaffold(
-              backgroundColor: AppColors.darkBackground,
-              body: MovieDetailsSkeleton(),
-            );
-          }
-
-         if (state is MovieDetailsError) {
-  return Scaffold(
-    backgroundColor: AppColors.darkBackground,
-    appBar: AppBar(
-      backgroundColor: AppColors.darkBackground,
-      foregroundColor: Colors.white,
-      elevation: 0,
-    ),
-    body: Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.error_outline_rounded,
-              color: Colors.white54,
-              size: 52,
-            ),
-
-            const SizedBox(height: 16),
-
-            Text(
-              state.message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 15,
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            ElevatedButton.icon(
-              onPressed: () {
-                context.read<MovieDetailsBloc>().add(
-                  RetryMovieDetailsRequested(
-                    movieId: movie.id,
-                  ),
+    return PopScope<void>(
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) onReturn?.call();
+      },
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider(
+            create: (_) {
+              final bloc = sl<WatchlistBloc>();
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                bloc.add(
+                  CheckMovieInWatchlist(userId: user.uid, movieId: movie.id),
                 );
-              },
-              icon: const Icon(Icons.refresh_rounded),
-              label: Text(l10n.retry),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primaryButton,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 13,
+              }
+              return bloc;
+            },
+          ),
+          BlocProvider(
+            create: (_) {
+              final bloc = sl<HistoryBloc>();
+              final user = FirebaseAuth.instance.currentUser;
+              if (user != null) {
+                bloc.add(AddMovieToHistory(userId: user.uid, movie: movie));
+              }
+              return bloc;
+            },
+          ),
+        ],
+        child: BlocBuilder<MovieDetailsBloc, MovieDetailsState>(
+          builder: (context, state) {
+            if (state is MovieDetailsLoading) {
+              return const Scaffold(
+                backgroundColor: AppColors.darkBackground,
+                body: MovieDetailsSkeleton(),
+              );
+            }
+
+            if (state is MovieDetailsError) {
+              return Scaffold(
+                backgroundColor: AppColors.darkBackground,
+                appBar: AppBar(
+                  backgroundColor: AppColors.darkBackground,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                body: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline_rounded,
+                          color: Colors.white54,
+                          size: 52,
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        Text(
+                          state.message,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 15,
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            context.read<MovieDetailsBloc>().add(
+                              RetryMovieDetailsRequested(movieId: movie.id),
+                            );
+                          },
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: Text(l10n.retry),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryButton,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 13,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ],
+              );
+            }
+
+            if (state is MovieDetailsSuccess) {
+              return _MovieDetailsContent(
+                movie: state.movie,
+                originalMovie: movie,
+              );
+            }
+
+            return const Scaffold(backgroundColor: AppColors.darkBackground);
+          },
         ),
-      ),
-    ),
-  );
-}
-
-          if (state is MovieDetailsSuccess) {
-            return _MovieDetailsContent(
-              movie: state.movie,
-              originalMovie: movie,
-            );
-          }
-
-          return const Scaffold(backgroundColor: AppColors.darkBackground,);
-        },
       ),
     );
   }
@@ -186,9 +179,7 @@ class _MovieDetailsContent extends StatelessWidget {
                         debugPrint('TRAILER CODE: ${movie.trailerCode}');
 
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(l10n.trailerNotAvailable),
-                          ),
+                          SnackBar(content: Text(l10n.trailerNotAvailable)),
                         );
                         return;
                       }
@@ -266,34 +257,28 @@ class _Hero extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           CachedNetworkImage(
-  imageUrl: imageUrl,
-  fit: BoxFit.cover,
-  memCacheWidth: 900,
-  placeholder: (context, url) {
-    return const ColoredBox(
-      color: AppColors.darkBackground,
-    );
-  },
-  errorWidget: (context, url, error) {
-    if (movie.backgroundImage.isNotEmpty &&
-        movie.backgroundImage != imageUrl) {
-      return CachedNetworkImage(
-        imageUrl: movie.backgroundImage,
-        fit: BoxFit.cover,
-        memCacheWidth: 900,
-        errorWidget: (_, _, _) {
-          return const ColoredBox(
-            color: AppColors.darkBackground,
-          );
-        },
-      );
-    }
+            imageUrl: imageUrl,
+            fit: BoxFit.cover,
+            memCacheWidth: 900,
+            placeholder: (context, url) {
+              return const ColoredBox(color: AppColors.darkBackground);
+            },
+            errorWidget: (context, url, error) {
+              if (movie.backgroundImage.isNotEmpty &&
+                  movie.backgroundImage != imageUrl) {
+                return CachedNetworkImage(
+                  imageUrl: movie.backgroundImage,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 900,
+                  errorWidget: (_, _, _) {
+                    return const ColoredBox(color: AppColors.darkBackground);
+                  },
+                );
+              }
 
-    return const ColoredBox(
-      color: AppColors.darkBackground,
-    );
-  },
-),
+              return const ColoredBox(color: AppColors.darkBackground);
+            },
+          ),
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -521,7 +506,11 @@ class _Stats extends StatelessWidget {
       children: [
         Expanded(
           child: _Stat(
-            icon: const Icon(Icons.favorite_rounded, color: AppColors.primaryButton, size: 19),
+            icon: const Icon(
+              Icons.favorite_rounded,
+              color: AppColors.primaryButton,
+              size: 19,
+            ),
             text: '${movie.likeCount}',
           ),
         ),
@@ -615,20 +604,16 @@ class _Screenshots extends StatelessWidget {
             child: AspectRatio(
               aspectRatio: 1.88,
               child: CachedNetworkImage(
-  imageUrl: screenshot,
-  fit: BoxFit.cover,
-  memCacheWidth: 900,
-  placeholder: (context, url) {
-    return const ColoredBox(
-      color: AppColors.darkSurface,
-    );
-  },
-  errorWidget: (context, url, error) {
-    return const ColoredBox(
-      color: AppColors.darkSurface,
-    );
-  },
-)
+                imageUrl: screenshot,
+                fit: BoxFit.cover,
+                memCacheWidth: 900,
+                placeholder: (context, url) {
+                  return const ColoredBox(color: AppColors.darkSurface);
+                },
+                errorWidget: (context, url, error) {
+                  return const ColoredBox(color: AppColors.darkSurface);
+                },
+              ),
             ),
           ),
         );
@@ -658,31 +643,26 @@ class _CastList extends StatelessWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(7),
-                child:CachedNetworkImage(
-  imageUrl: actor.imageUrl,
-  width: 50,
-  height: 50,
-  fit: BoxFit.cover,
-  memCacheWidth: 100,
-  placeholder: (context, url) {
-    return const ColoredBox(
-      color: Color(0xFF3A3A3A),
-    );
-  },
-  errorWidget: (context, url, error) {
-    return const ColoredBox(
-      color: Color(0xFF3A3A3A),
-      child: SizedBox(
-        width: 50,
-        height: 50,
-        child: Icon(
-          Icons.person,
-          color: Colors.white54,
-        ),
-      ),
-    );
-  },
-)
+                child: CachedNetworkImage(
+                  imageUrl: actor.imageUrl,
+                  width: 50,
+                  height: 50,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 100,
+                  placeholder: (context, url) {
+                    return const ColoredBox(color: Color(0xFF3A3A3A));
+                  },
+                  errorWidget: (context, url, error) {
+                    return const ColoredBox(
+                      color: Color(0xFF3A3A3A),
+                      child: SizedBox(
+                        width: 50,
+                        height: 50,
+                        child: Icon(Icons.person, color: Colors.white54),
+                      ),
+                    );
+                  },
+                ),
               ),
               const SizedBox(width: 9),
               Expanded(

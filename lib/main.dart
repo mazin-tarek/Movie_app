@@ -23,7 +23,9 @@ void main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await initDependencies();
-  runApp(const MyApp());
+  runApp(
+    
+    const MyApp());
 }
 
 final GoRouter _router = GoRouter(

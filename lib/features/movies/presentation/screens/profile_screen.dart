@@ -31,13 +31,23 @@ class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  State<ProfileScreen> createState() => ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen>
+class ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   UserEntity? _currentUser;
+  WatchlistBloc? _watchlistBloc;
+  HistoryBloc? _historyBloc;
+
+  void refreshCollections() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (!mounted || user == null) return;
+
+    _watchlistBloc?.add(GetWatchlistRequested(userId: user.uid));
+    _historyBloc?.add(GetHistoryRequested(userId: user.uid));
+  }
 
   @override
   void initState() {
@@ -50,81 +60,72 @@ class _ProfileScreenState extends State<ProfileScreen>
     _tabController.dispose();
     super.dispose();
   }
-@override
-Widget build(BuildContext context) {
-  final user = FirebaseAuth.instance.currentUser;
 
-  return MultiBlocProvider(
-    providers: [
-      BlocProvider(
-        create: (_) {
-          final bloc = sl<WatchlistBloc>();
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
 
-          if (user != null) {
-            bloc.add(
-           GetWatchlistRequested(
-  userId: user.uid,
-),
-            );
-          }
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) {
+            final bloc = sl<WatchlistBloc>();
+            _watchlistBloc = bloc;
 
-          return bloc;
-        },
-      ),
-      BlocProvider(
-        create: (_) {
-          final bloc = sl<HistoryBloc>();
-
-          if (user != null) {
-            bloc.add(
-GetHistoryRequested(
-  userId: user.uid,
-),            );
-          }
-
-          return bloc;
-        },
-      ),
-    ],
-    child: Scaffold(
-      backgroundColor: AppColors.darkBackground,
-      body: SafeArea(
-        child: BlocConsumer<AuthBloc, AuthState>(
-          listener: (context, state) {
-            if (state is Authenticated) {
-              _currentUser = state.user;
+            if (user != null) {
+              bloc.add(GetWatchlistRequested(userId: user.uid));
             }
 
-            if (state is Unauthenticated) {
-              _tabController.index = 0;
-              context.go('/login');
-            }
-          },
-          builder: (context, state) {
-            if (state is AuthLoading || state is AuthInitial) {
-              return const Center(
-                child: MovieSkeletonBox(
-                  width: 100,
-                  height: 100,
-                  borderRadius: BorderRadius.all(
-                    Radius.circular(50),
-                  ),
-                ),
-              );
-            }
-
-            final user = state is Authenticated ? state.user : _currentUser;
-
-            return _ProfileContent(
-              user: user,
-              tabController: _tabController,
-            );
+            return bloc;
           },
         ),
+        BlocProvider(
+          create: (_) {
+            final bloc = sl<HistoryBloc>();
+            _historyBloc = bloc;
+
+            if (user != null) {
+              bloc.add(GetHistoryRequested(userId: user.uid));
+            }
+
+            return bloc;
+          },
+        ),
+      ],
+      child: Scaffold(
+        backgroundColor: AppColors.darkBackground,
+        body: SafeArea(
+          child: BlocConsumer<AuthBloc, AuthState>(
+            listener: (context, state) {
+              if (state is Authenticated) {
+                _currentUser = state.user;
+              }
+
+              if (state is Unauthenticated) {
+                _tabController.index = 0;
+                context.go('/login');
+              }
+            },
+            builder: (context, state) {
+              if (state is AuthLoading || state is AuthInitial) {
+                return const Center(
+                  child: MovieSkeletonBox(
+                    width: 100,
+                    height: 100,
+                    borderRadius: BorderRadius.all(Radius.circular(50)),
+                  ),
+                );
+              }
+
+              final user = state is Authenticated ? state.user : _currentUser;
+
+              return _ProfileContent(user: user, tabController: _tabController);
+            },
+          ),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 class _ProfileContent extends StatelessWidget {
@@ -146,7 +147,7 @@ class _ProfileContent extends StatelessWidget {
           color: const Color(0xFF202020),
           child: Column(
             children: [
-               Padding(
+              Padding(
                 padding: EdgeInsets.fromLTRB(20, 5, 20, 12),
                 child: Align(
                   alignment: Alignment.centerLeft,
@@ -171,33 +172,33 @@ class _ProfileContent extends StatelessWidget {
                         Expanded(
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                           children: [
-  BlocBuilder<WatchlistBloc, WatchlistState>(
-    builder: (context, state) {
-      final count = state is WatchlistLoaded
-          ? state.movies.length
-          : 0;
+                            children: [
+                              BlocBuilder<WatchlistBloc, WatchlistState>(
+                                builder: (context, state) {
+                                  final count = state is WatchlistLoaded
+                                      ? state.movies.length
+                                      : 0;
 
-      return _ProfileStat(
-        value: count.toString(),
-        label: l10n.watchlist,
-      );
-    },
-  ),
+                                  return _ProfileStat(
+                                    value: count.toString(),
+                                    label: l10n.watchlist,
+                                  );
+                                },
+                              ),
 
-  BlocBuilder<HistoryBloc, HistoryState>(
-    builder: (context, state) {
-      final count = state is HistoryLoaded
-          ? state.movies.length
-          : 0;
+                              BlocBuilder<HistoryBloc, HistoryState>(
+                                builder: (context, state) {
+                                  final count = state is HistoryLoaded
+                                      ? state.movies.length
+                                      : 0;
 
-      return _ProfileStat(
-        value: count.toString(),
-        label: l10n.history,
-      );
-    },
-  ),
-],
+                                  return _ProfileStat(
+                                    value: count.toString(),
+                                    label: l10n.history,
+                                  );
+                                },
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -261,20 +262,25 @@ class _ProfileContent extends StatelessWidget {
             ],
           ),
         ),
-      Expanded(
-  child: TabBarView(
-    controller: tabController,
-    children: const [
-      _WatchlistTab(),
-      _HistoryTab(),
-    ],
-  ),
-),
+        Expanded(
+          child: TabBarView(
+            controller: tabController,
+            children: const [_WatchlistTab(), _HistoryTab()],
+          ),
+        ),
       ],
     );
   }
-  
 }
+
+void _refreshCollections(BuildContext context) {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  context.read<WatchlistBloc>().add(GetWatchlistRequested(userId: user.uid));
+  context.read<HistoryBloc>().add(GetHistoryRequested(userId: user.uid));
+}
+
 class _WatchlistTab extends StatelessWidget {
   const _WatchlistTab();
 
@@ -284,9 +290,7 @@ class _WatchlistTab extends StatelessWidget {
     return BlocBuilder<WatchlistBloc, WatchlistState>(
       builder: (context, state) {
         if (state is WatchlistLoading) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (state is WatchlistError) {
@@ -301,7 +305,7 @@ class _WatchlistTab extends StatelessWidget {
 
         if (state is WatchlistLoaded) {
           if (state.movies.isEmpty) {
-            return  _EmptyCollection(
+            return _EmptyCollection(
               iconPath: AppAssets.watchlist,
               message: l10n.watchlistEmpty,
             );
@@ -309,6 +313,7 @@ class _WatchlistTab extends StatelessWidget {
 
           return _MovieGrid(
             movies: state.movies,
+            onReturn: () => _refreshCollections(context),
           );
         }
 
@@ -317,6 +322,7 @@ class _WatchlistTab extends StatelessWidget {
     );
   }
 }
+
 class _HistoryTab extends StatelessWidget {
   const _HistoryTab();
 
@@ -326,9 +332,7 @@ class _HistoryTab extends StatelessWidget {
     return BlocBuilder<HistoryBloc, HistoryState>(
       builder: (context, state) {
         if (state is HistoryLoading) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (state is HistoryError) {
@@ -343,7 +347,7 @@ class _HistoryTab extends StatelessWidget {
 
         if (state is HistoryLoaded) {
           if (state.movies.isEmpty) {
-            return  _EmptyCollection(
+            return _EmptyCollection(
               iconPath: AppAssets.history,
               message: l10n.historyEmpty,
             );
@@ -351,6 +355,7 @@ class _HistoryTab extends StatelessWidget {
 
           return _MovieGrid(
             movies: state.movies,
+            onReturn: () => _refreshCollections(context),
           );
         }
 
@@ -359,12 +364,12 @@ class _HistoryTab extends StatelessWidget {
     );
   }
 }
+
 class _MovieGrid extends StatelessWidget {
   final List<MovieEntity> movies;
+  final VoidCallback onReturn;
 
-  const _MovieGrid({
-    required this.movies,
-  });
+  const _MovieGrid({required this.movies, required this.onReturn});
 
   @override
   Widget build(BuildContext context) {
@@ -385,19 +390,13 @@ class _MovieGrid extends StatelessWidget {
           onTap: () {
             final bloc = sl<MovieDetailsBloc>();
 
-            bloc.add(
-              GetMovieDetailsRequested(
-                movieId: movie.id,
-              ),
-            );
+            bloc.add(GetMovieDetailsRequested(movieId: movie.id));
 
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => BlocProvider.value(
                   value: bloc,
-                  child: MovieDetailsScreen(
-                    movie: movie,
-                  ),
+                  child: MovieDetailsScreen(movie: movie, onReturn: onReturn),
                 ),
               ),
             );
@@ -587,10 +586,7 @@ class _EmptyCollection extends StatelessWidget {
               Text(
                 message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white54,
-                  fontSize: 15,
-                ),
+                style: const TextStyle(color: Colors.white54, fontSize: 15),
               ),
             ],
           ),
